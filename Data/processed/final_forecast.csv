@@ -1,2 +1,2 @@
-Selected_Model,Latest_Observed_USD_LKR,Forecast_Horizon,Forecast_USD_LKR
-Naive,329.0158,One-Step-Ahead,329.0158
+Latest_Observation_Date,Latest_Observed_Rate,Predicted_Next_Rate,Model
+2026-09-25,330.3522,330.3522,Naive
