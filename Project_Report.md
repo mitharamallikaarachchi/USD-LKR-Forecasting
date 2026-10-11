@@ -6,7 +6,7 @@ This study investigates whether the next published USD/LKR exchange rate can be 
 
 The project follows a complete forecasting workflow: data extraction and cleaning, exploratory analysis, return and volatility analysis, stationarity testing, feature engineering, chronological model evaluation, and final model selection. Five approaches are compared: a naive persistence benchmark, ARIMA(1,1,1), GARCH(1,1), XGBoost, and LSTM. The final modelling dataset contains 3,477 complete observations. The first 80% is used for training and the final 20% is used as an unseen chronological test set.
 
-The naive forecast performs best, with an MAE of 0.463135 and RMSE of 0.886722. GARCH performs almost identically, while XGBoost, LSTM, and ARIMA produce larger errors. The results suggest that, for this one-step-ahead level forecast, the most recent exchange-rate observation is a stronger predictor than the additional univariate features used by the more complex models. The analysis also shows that 2022 was a distinct high-volatility regime: average rolling volatility was approximately twice the level observed during the 2023–2024 stabilization period.
+The naive forecast performs best, with an MAE of 0.463135 and RMSE of 0.886722. GARCH performs almost identically, while XGBoost, LSTM, and ARIMA produce larger errors. The results suggest that, for this one-step-ahead level forecast, the most recent exchange-rate observation is a stronger predictor than the additional univariate features used by the more complex models. A separate final-prediction notebook applies the selected Naive model to the latest stored observation and produces a one-step forecast of 330.3522. The analysis also shows that 2022 was a distinct high-volatility regime: average rolling volatility was approximately twice the level observed during the 2023–2024 stabilization period.
 
 **Keywords:** USD/LKR, exchange-rate forecasting, time series, ARIMA, GARCH, XGBoost, LSTM, volatility, Sri Lankan economic crisis
 
@@ -82,7 +82,7 @@ The data-collection stage performs the following operations:
 5. check for missing exchange-rate values; and
 6. save the result as `master_dataset.csv`.
 
-The resulting series contains no missing USD/LKR values. The first observation is 113.6975 on 2010-05-07 and the final stored observation is 330.3522 on 2026-09-25. The saved modelling forecast uses 329.0158 as its latest observed modelling value because the one-step target construction ends one observation earlier.
+The resulting series contains no missing USD/LKR values. The first observation is 113.6975 on 2010-05-07 and the final stored observation is 330.3522 on 2026-09-25. The final-prediction stage uses this latest valid observation as the current value and therefore produces 330.3522 as the Naive forecast for the next published observation.
 
 ![Historical USD-LKR Exchange Rate](figures/Historical%20USD-LKR%20Exchange%20Rate.png)
 
@@ -348,7 +348,7 @@ XGBoost obtains MAE 1.857661 and RMSE 2.426569.
 
 ![LSTM Training and Validation Loss](figures/LSTM%20Training%20and%20Validation%20Loss.png)
 
-**Figure 19. LSTM training and validation loss.** The loss curves describe the training process. They are useful for diagnosing convergence and possible overfitting, but they are not a replacement for the final untouched test metrics. The LSTM obtains MAE 21.718804 and RMSE 22.096873.
+**Figure 19. LSTM training and validation loss.** The loss curves describe the training process. They are useful for diagnosing convergence and possible overfitting, but they are not a replacement for the final untouched test metrics. The LSTM obtains MAE 7.440381 and RMSE 7.567803.
 
 ### 6.6 Final model comparison
 
@@ -365,7 +365,7 @@ The final comparison is:
 | 1 | **Naive** | **0.463135** | **0.886722** |
 | 2 | GARCH | 0.465039 | 0.887716 |
 | 3 | XGBoost | 1.857661 | 2.426569 |
-| 4 | LSTM | 21.718804 | 22.096873 |
+| 4 | LSTM | 7.440381 | 7.567803 |
 | 5 | ARIMA | 23.063531 | 25.768170 |
 
 ![MAE Comparison](figures/MAE%20Comparison%20of%20USD-LKR%20Forecasting%20Models.png)
@@ -375,6 +375,12 @@ The final comparison is:
 ![RMSE Comparison](figures/RMSE%20Comparison%20of%20USD-LKR%20Forecasting%20Models.png)
 
 **Figure 22. Final RMSE comparison.** The RMSE ranking is the same as the MAE ranking. The larger gap between RMSE and MAE reflects the impact of occasional large forecasting errors.
+
+The final-prediction notebook then loads the complete cleaned master dataset, validates and sorts the observations, selects the latest valid date and rate, and writes the selected Naive forecast to `final_forecast.csv`. The stored output is 330.3522 for the predicted next rate, based on the latest observation dated 2026-09-25. This is a one-step-ahead value rather than a forecast assigned to a fabricated calendar date.
+
+![USD-LKR Exchange Rate: Recent Observations and Naive Forecast](figures/USD-LKR%20Exchange%20Rate-%20Recent%20Observations%20and%20Naive%20Forecast.png)
+
+**Figure 23. Recent USD/LKR observations and Naive forecast.** The figure shows the 30 most recent exchange-rate observations and marks the Naive forecast value. Because the Naive method sets the next predicted rate equal to the latest observed rate, the forecast marker is located at the latest observation value of 330.3522.
 
 ---
 
@@ -439,7 +445,7 @@ Future research should:
 
 ## 10. Conclusion
 
-This project finds that the simple naive forecast is the most accurate model for one-step-ahead USD/LKR level prediction on the selected chronological test period. Its MAE is 0.463135 and RMSE is 0.886722, narrowly outperforming GARCH and clearly outperforming XGBoost, LSTM, and ARIMA.
+This project finds that the simple naive forecast is the most accurate model for one-step-ahead USD/LKR level prediction on the selected chronological test period. Its MAE is 0.463135 and RMSE is 0.886722, narrowly outperforming GARCH and clearly outperforming XGBoost, LSTM, and ARIMA. Applying the selected model to the latest stored observation produces a final one-step forecast of 330.3522.
 
 The central lesson is that more complicated models do not automatically provide better forecasts. The latest observed exchange rate contains strong short-run information, while the univariate historical features provide limited additional predictive power. At the same time, GARCH remains valuable for modelling changing risk, and the crisis analysis demonstrates that volatility and return behaviour can differ substantially between economic regimes.
 
@@ -456,6 +462,8 @@ Run the notebooks in this order:
 3. [`notebooks/03_feature_engineering.ipynb`](notebooks/03_feature_engineering.ipynb)  
    Creates the lagged and rolling predictors and `feature_engineered_dataset.csv`.
 4. [`notebooks/04_model_development_and_forecasting.ipynb`](notebooks/04_model_development_and_forecasting.ipynb)  
-   Trains the five forecasting approaches, creates forecast figures, saves result tables, and writes `final_forecast.csv`.
+   Trains the five forecasting approaches, creates forecast figures, and saves the model-result tables.
+5. [`notebooks/05_final_prediction.ipynb`](notebooks/05_final_prediction.ipynb)
+   Loads the complete cleaned dataset, applies the selected Naive model to the latest valid observation, visualizes the recent observations, and writes `final_forecast.csv`.
 
-The final outputs should reproduce the five-model metrics and the selected Naive forecast documented in this report.
+The final outputs should reproduce the five-model metrics, the final stored observation, and the selected Naive forecast documented in this report.
