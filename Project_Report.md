@@ -51,7 +51,7 @@ The study focuses on one-step-ahead forecasting. It does not claim to forecast a
 
 ### 2.1 Raw dataset
 
-The raw input is [`Data/raw/cbsl.csv`](Data/raw/cbsl.csv). It contains exchange-rate observations for multiple currency pairs. The file has 190,935 rows and five columns:
+The raw input dataset, cbsl.csv, was obtained from the Central Bank Exchange Rates dataset published on Kaggle by AllRatesToday. The dataset is available at the following source: Kaggle – Central Bank Exchange Rates. It contains historical exchange-rate observations collected from central bank publications, including data from the Central Bank of Sri Lanka (CBSL). The dataset used in this study contains 190,935 rows and five columns.
 
 | Column | Description |
 |---|---|
