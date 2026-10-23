@@ -1,469 +1,313 @@
-# Forecasting the USD/LKR Exchange Rate
+# Forecasting the USD/LKR Exchange Rate Under Economic Regime Changes
 
 ## Abstract
 
-This study investigates whether the next published USD/LKR exchange rate can be forecast more accurately using traditional time-series models or machine-learning models. The analysis uses 3,499 indicative USD/LKR observations extracted from a Central Bank of Sri Lanka exchange-rate dataset. The data covers the period from 7 May 2010 to 25 September 2026 and includes the major economic disruption experienced during 2022.
+This study evaluates whether the next published USD/LKR indicative exchange-rate observation can be forecast using traditional time-series methods and machine-learning methods. The analysis uses 3,499 observations from 7 May 2010 to 25 September 2026. The workflow includes data validation, return and distribution analysis, stationarity tests, autocorrelation diagnostics, regime analysis around the March 2022 policy change, leakage-aware feature construction, chronological validation, one-step forecasting, volatility forecasting, multi-horizon analysis, and a historical 2022 stress test.
 
-The project follows a complete forecasting workflow: data extraction and cleaning, exploratory analysis, return and volatility analysis, stationarity testing, feature engineering, chronological model evaluation, and final model selection. Five approaches are compared: a naive persistence benchmark, ARIMA(1,1,1), GARCH(1,1), XGBoost, and LSTM. The final modelling dataset contains 3,477 complete observations. The first 80% is used for training and the final 20% is used as an unseen chronological test set.
+The primary one-step comparison uses 3,067 eligible observations from 2014 onward for which the next observation is no more than five calendar days away. The data is divided chronologically into training (2,146), validation (460), and test (461) observations. ARIMA(1,1,1), selected using validation MAE, achieves the lowest test MAE (0.406721). The Naive benchmark has MAE 0.424284 and RMSE 0.947432; XGBoost-return has MAE 0.448500; LSTM-return has MAE 0.511477; and MLP-return performs substantially worse. GARCH is evaluated separately as a volatility model and obtains test volatility MSE 0.411381 and QLIKE -2.46633.
 
-The naive forecast performs best, with an MAE of 0.463135 and RMSE of 0.886722. GARCH performs almost identically, while XGBoost, LSTM, and ARIMA produce larger errors. The results suggest that, for this one-step-ahead level forecast, the most recent exchange-rate observation is a stronger predictor than the additional univariate features used by the more complex models. A separate final-prediction notebook applies the selected Naive model to the latest stored observation and produces a one-step forecast of 330.3522. The analysis also shows that 2022 was a distinct high-volatility regime: average rolling volatility was approximately twice the level observed during the 2023–2024 stabilization period.
+The final model selected by validation is ARIMA(1,1,1). Refit to the complete available level series, it produces a forecast of **330.3869** for the next observed exchange-rate observation, with an approximate 95% prediction interval of **327.8478 to 332.9260**. The results show that model complexity does not guarantee better performance, that the March 2022 regime change is statistically and economically important, and that point forecasting and volatility forecasting should not be treated as the same task.
 
-**Keywords:** USD/LKR, exchange-rate forecasting, time series, ARIMA, GARCH, XGBoost, LSTM, volatility, Sri Lankan economic crisis
+**Keywords:** USD/LKR, exchange-rate forecasting, ARIMA, XGBoost, LSTM, GARCH, regime change, volatility, Sri Lanka
 
 ---
 
 ## 1. Introduction
 
-Exchange-rate movements affect import costs, export earnings, foreign debt payments, tourism receipts, remittances, and business planning. For Sri Lanka, the USD/LKR exchange rate is particularly important because many domestic transactions and external obligations are influenced by the value of the US dollar relative to the Sri Lankan rupee.
-
-Exchange rates are difficult to forecast. They can contain trends, random-walk-like behaviour, volatility clustering, structural breaks, policy effects, and sudden responses to economic news. A model that performs well during a stable period may perform poorly during a crisis. Therefore, comparing only one sophisticated model is not sufficient. A meaningful study should compare simple and complex approaches using a time-ordered evaluation design.
-
-This project was developed in response to the requirements in [`Group Assignment.pdf`](Group%20Assignment.pdf), which require a real financial forecasting problem, actual financial data, exploratory and statistical analysis, traditional time-series models, machine-learning models, a simple baseline, time-based evaluation, additional financial analysis, interpretation, and limitations.
+Exchange-rate movements affect import costs, export earnings, foreign debt payments, tourism receipts, remittances, and business planning. Forecasting the USD/LKR rate is difficult because the series contains persistence, structural breaks, changing volatility, policy effects, and sudden movements.
 
 ### 1.1 Research question
 
-> **How effectively can the next published USD/LKR exchange-rate observation be forecast using traditional time-series methods compared with machine-learning methods, and what can be learned from the differences in their performance?**
+> How effectively can the next published USD/LKR observation be forecast using traditional time-series and machine-learning methods, and how does performance change across horizons and economic regimes?
 
 ### 1.2 Objectives
 
-The study has six objectives:
-
-1. obtain and clean a real USD/LKR exchange-rate dataset;
-2. describe the long-term level, returns, and volatility of the exchange rate;
-3. investigate stationarity, autocorrelation, and the 2022 crisis regime;
-4. create historical and rolling features without using future information;
-5. compare a naive benchmark with ARIMA, GARCH, XGBoost, and LSTM; and
-6. interpret the results from a financial and risk-management perspective.
+1. Obtain and validate a real USD/LKR indicative exchange-rate series.
+2. Examine levels, log returns, distributional properties, stationarity, dependence, and volatility.
+3. Identify the effect of the March 2022 move away from the managed exchange-rate regime.
+4. Construct features using information available at the forecast origin.
+5. Compare a Naive benchmark, ARIMA, XGBoost, MLP, and LSTM using chronological evaluation.
+6. Evaluate GARCH as a volatility model and examine longer horizons and the 2022 stress period.
 
 ### 1.3 Forecasting target
 
-The target is the USD/LKR value at the **next available observation**. The raw data contains published business-day observations, so the target is not an artificially interpolated calendar-day rate. For an observation at time \(t\), the target is:
+For an observation at time \(t\), the primary target is the rate at the next available observation:
 
 $$
 Target_t = USD\_LKR_{t+1}.
 $$
 
-The study focuses on one-step-ahead forecasting. It does not claim to forecast a specific future date several weeks or months ahead.
+The target is observation-based rather than a fabricated calendar date. Lags and horizons therefore represent observations, not necessarily exact calendar days.
 
 ---
 
-## 2. Data and dataset preparation
+## 2. Data and preparation
 
-### 2.1 Raw dataset
+### 2.1 Data source and filtering
 
-The raw input dataset, cbsl.csv, was obtained from the Central Bank Exchange Rates dataset published on Kaggle by AllRatesToday. The dataset is available at the following source: Kaggle – Central Bank Exchange Rates. It contains historical exchange-rate observations collected from central bank publications, including data from the Central Bank of Sri Lanka (CBSL). The dataset used in this study contains 190,935 rows and five columns.
+The raw file is `data/raw/cbsl.csv`, identified by the notebooks as a Central Bank of Sri Lanka (CBSL) exchange-rate file. The raw file contains 190,935 rows and five columns: `date`, `base`, `quote`, `type`, and `value`. The project retains rows satisfying:
 
-| Column | Description |
+| Filter | Value |
 |---|---|
-| `date` | Date on which the exchange rate was published |
-| `base` | Base currency |
-| `quote` | Quoted currency |
-| `type` | Type of exchange rate |
-| `value` | Numeric exchange-rate value |
+| Base currency | USD |
+| Quote currency | LKR |
+| Rate type | indicative |
 
-The collection notebook filters the raw file using:
+This produces 3,499 observations. The exact source URL and retrieval date are not encoded in the supplied CSV and should be added if required by the submission instructions; they are not guessed here.
 
-```text
-base == "USD"
-quote == "LKR"
-type == "indicative"
-```
+### 2.2 Cleaning and coverage
 
-This produces 3,499 USD/LKR observations. Only `date` and `value` are retained, and `value` is renamed to `USD_LKR`.
+Dates were parsed, observations were sorted chronologically, duplicate dates were removed, and invalid values were excluded. No duplicate dates or missing USD/LKR values remained. The cleaned series runs from **2010-05-07** to **2026-09-25**. There are 41 gaps longer than five calendar days; the longest is 65 calendar days. There are 387 zero-change observations and 354 observations flagged by the notebook’s robust extreme-return diagnostic. These flagged observations were inspected, not automatically deleted.
 
-### 2.2 Cleaning procedure
+![CBSL USD/LKR indicative exchange rate](figures_new/CBSL%20USD-LKR%20Indicative%20Exchange%20Rate.png)
 
-The data-collection stage performs the following operations:
+**Figure 1. CBSL USD/LKR indicative exchange rate.** The full history shows the long-run movement of the rate and the sharp change around 2022.
 
-1. convert the date column to a datetime type;
-2. sort observations chronologically;
-3. remove duplicate dates;
-4. set the date as the time-series index;
-5. check for missing exchange-rate values; and
-6. save the result as `master_dataset.csv`.
+### 2.3 Observation-based returns
 
-The resulting series contains no missing USD/LKR values. The first observation is 113.6975 on 2010-05-07 and the final stored observation is 330.3522 on 2026-09-25. The final-prediction stage uses this latest valid observation as the current value and therefore produces 330.3522 as the Naive forecast for the next published observation.
+The log return is:
 
-![Historical USD-LKR Exchange Rate](figures/Historical%20USD-LKR%20Exchange%20Rate.png)
+$$
+r_t=\ln\left(\frac{P_t}{P_{t-1}}\right).
+$$
 
-**Figure 1. Historical USD/LKR exchange rate.** The complete series shows a long-term upward movement in the number of rupees required to buy one US dollar. The most visible change occurs around 2022, when the rate moves rapidly to a substantially higher level. This long-run movement is why the level series must not automatically be treated as stationary.
-
-### 2.3 Processed datasets
-
-The project saves intermediate datasets so that each stage can be reproduced independently.
-
-| File | Contents | Role in the analysis |
-|---|---|---|
-| [`Data/processed/master_dataset.csv`](Data/processed/master_dataset.csv) | `date`, `USD_LKR`; 3,499 rows | Clean exchange-rate level used for EDA |
-| [`Data/processed/usd_lkr_eda.csv`](Data/processed/usd_lkr_eda.csv) | Exchange rate, log return, 20-observation rolling volatility | EDA output and feature-engineering input |
-| [`Data/processed/feature_engineered_dataset.csv`](Data/processed/feature_engineered_dataset.csv) | 14 columns and 3,477 complete rows | Final modelling dataset |
-| [`Data/processed/model_results_initial.csv`](Data/processed/model_results_initial.csv) | Naive and ARIMA results | Intermediate comparison |
-| [`Data/processed/model_results.csv`](Data/processed/model_results.csv) | Results for all five models | Consolidated model output |
-| [`Data/processed/final_model_results.csv`](Data/processed/final_model_results.csv) | Five-model results | Final unsorted result table |
-| [`Data/processed/final_model_comparison.csv`](Data/processed/final_model_comparison.csv) | Five-model results sorted by RMSE | Final ranking |
-| [`Data/processed/final_forecast.csv`](Data/processed/final_forecast.csv) | Selected model and one-step forecast | Final forecast output |
-
-The result files are workflow outputs, not separate experiments. `model_results_initial.csv` documents the early Naive-versus-ARIMA comparison; the later files include GARCH, XGBoost, and LSTM.
-
-### 2.4 Data-quality and provenance considerations
-
-The repository identifies the raw file as a CBSL dataset. For formal publication, the source URL, download date, release/version, and any upstream data transformations should also be recorded. The stored data extends to September 2026, so the group should verify the source snapshot before submitting the report. This report describes the files currently present in the repository.
+Because the data contains weekends, holidays, and longer source gaps, a return is a change between consecutive observations and should not automatically be described as a one-calendar-day return.
 
 ---
 
-## 3. Exploratory analysis
+## 3. Exploratory and statistical analysis
 
-### 3.1 Descriptive statistics of the exchange-rate level
+### 3.1 Levels and log returns
 
-The cleaned level series contains 3,499 observations:
+![USD/LKR exchange rate and log returns](figures_new/USD-LKR%20Exchange%20Rate%20and%20Log%20Returns%20Between%20Consecutive%20Observations.png)
 
-| Statistic | Value |
-|---|---:|
-| Mean | 206.526733 |
-| Standard deviation | 80.919184 |
-| Minimum | 109.459700 |
-| 25th percentile | 141.541700 |
-| Median | 179.672200 |
-| 75th percentile | 299.827500 |
-| Maximum | 364.760000 |
+**Figure 2. USD/LKR exchange rate and log returns between consecutive observations.** The level and return panels answer different questions: the level captures long-run price movement, while returns capture proportional changes between observed rates.
 
-The large range reflects both gradual depreciation and the abrupt 2022 change. These are properties of the level, not direct measures of daily risk.
+![USD/LKR log returns](figures_new/USD-LKR%20Log%20Returns%20Between%20Consecutive%20Observations.png)
 
-### 3.2 The 2022 crisis
+**Figure 3. USD/LKR log returns between consecutive observations.** Most changes are close to zero, but large movements occur during unstable periods.
 
-The analysis defines January–December 2022 as the crisis period. The year contains 240 observations.
+### 3.2 Return distribution
 
-![USD-LKR Exchange Rate During 2022](figures/USD-LKR%20Exchange%20Rate%20During%202022.png)
+The return sample contains 3,498 observations. Its mean is 0.000305, standard deviation is 0.004890, skewness is 8.739760, and excess kurtosis is 201.417102. The minimum is -0.040162 and the maximum is 0.127185. The Jarque–Bera statistic is 5,957,441.2456 with p-value 0, providing strong evidence against normality.
 
-**Figure 2. USD/LKR exchange rate during 2022.** Isolating 2022 makes the rapid level change easier to see than the full-history plot. The rate does not simply fluctuate around its earlier range; it experiences a sharp change in the exchange-rate regime.
+![Distribution of USD/LKR log returns](figures_new/Distribution%20of%20USD-LKR%20Log%20Returns.png)
 
-The project compares this crisis period with January 2023–December 2024, labelled the stabilization period.
+**Figure 4. Distribution of USD/LKR log returns.** The concentration near zero and very long tails show why large shocks can strongly affect squared-error metrics.
 
-![USD-LKR Exchange Rate Crisis and Stabilization](figures/USD-LKR%20Exchange%20Rate-%20Crisis%20vs%20Stabilization.png)
+![Log-return distribution by economic period](figures_new/Log-Return%20Distribution%20by%20Period.png)
 
-**Figure 3. Crisis and stabilization exchange-rate levels.** The crisis and stabilization periods occupy different level ranges and show different movement patterns. The stabilization period is not a return to the pre-crisis level; rather, it is a period of lower short-run variability around a new level.
+**Figure 5. Log-return distribution by economic period.** Return behaviour differs across the managed, floating/shock, and post-2022 stabilization periods.
 
-### 3.3 Log returns
+### 3.3 Stationarity
 
-To study changes rather than levels, the project calculates the logarithmic return:
+Both ADF and KPSS results were considered:
 
-$$
-r_t = \ln\left(\frac{P_t}{P_{t-1}}\right),
-$$
+| Series | ADF statistic | ADF p-value | KPSS statistic | KPSS p-value | N |
+|---|---:|---:|---:|---:|---:|
+| USD/LKR level | -0.992196 | 0.756100 | 7.980349 | 0.01 | 3,499 |
+| Log return | -8.442357 | 1.75e-13 | 0.077462 | 0.10 | 3,498 |
 
-where \(P_t\) is the USD/LKR rate at observation \(t\). The first observation has no previous value and therefore has one missing return.
+The level results are consistent with non-stationarity, while the return results support stationarity. This motivates differencing for ARIMA and return-based modelling for the machine-learning and volatility analyses.
 
-![Daily USD-LKR Log Returns](figures/Daily%20USD-LKR%20Log%20Returns.png)
+### 3.4 Autocorrelation and ARCH effects
 
-**Figure 4. Daily USD/LKR log returns.** Most daily changes are close to zero, but large positive and negative movements appear around unstable periods. This indicates that the rate can look relatively smooth in levels while still having substantial short-run shocks.
+![ACF of USD/LKR log returns](figures_new/ACF%20of%20USD-LKR%20Log%20Returns.png)
 
-### 3.4 Distribution of returns
+**Figure 6. ACF of USD/LKR log returns.** The ACF provides evidence about serial dependence at individual lags.
 
-![Distribution of USD-LKR Daily Log Returns](figures/Distribution%20of%20USD-LKR%20Daily%20Log%20Returns.png)
+![PACF of USD/LKR log returns](figures_new/PACF%20of%20USD-LKR%20Log%20Returns.png)
 
-**Figure 5. Distribution of daily log returns.** Returns are concentrated near zero but have long tails. This means that extreme movements occur more often than a narrow, constant-variance distribution would suggest. Such observations influence RMSE strongly because RMSE squares each error.
+**Figure 7. PACF of USD/LKR log returns.** The PACF helps distinguish additional lag relationships after shorter lags are considered.
 
-![Boxplot of USD-LKR Daily Log Returns](figures/Boxplot%20of%20USD-LKR%20Daily%20Log%20Returns.png)
+The Ljung–Box p-values are \(2.47\times10^{-81}\) at lag 10 and \(1.91\times10^{-89}\) at lag 20, indicating joint serial dependence at the tested lags. The ARCH-LM statistic is 605.4668 with p-value \(1.19\times10^{-123}\), and the corresponding F-test p-value is \(3.93\times10^{-136}\). These results support examining conditional volatility, but they do not guarantee that a GARCH model will produce the best point forecast.
 
-**Figure 6. Boxplot of daily log returns.** The boxplot shows a compact central range with several extreme outliers. These outliers are evidence of unusual market movements and reinforce the need to distinguish typical forecasting accuracy from performance during shocks.
+### 3.5 Economic periods and the March 2022 break
 
-### 3.5 Rolling volatility
+The notebooks define three analytical periods:
 
-The project uses the standard deviation of the previous 20 returns as a short-run volatility measure:
+| Period | Observations | Dates | Mean rate | Rate standard deviation | Mean return | Return standard deviation |
+|---|---:|---|---:|---:|---:|---:|
+| Pre-float / managed | 2,399 | 2010-05-07 to 2022-03-08 | 154.694578 | 27.172521 | 0.000240 | 0.003094 |
+| Floating / 2022 shock | 198 | 2022-03-09 to 2022-12-30 | 350.623253 | 27.416223 | 0.002960 | 0.014723 |
+| Post-2022 stabilization | 902 | 2023-01-02 to 2026-09-25 | 312.750934 | 16.719445 | -0.000105 | 0.004269 |
 
-$$
-\sigma_{20,t} = Std(r_{t-19}, \ldots, r_t).
-$$
+![USD/LKR across defined economic periods](figures_new/USD-LKR%20Across%20Defined%20Economic%20Periods.png)
 
-![20-Day Rolling Volatility of USD-LKR Log Returns](figures/20-Day%20Rolling%20Volatility%20of%20USD-LKR%20Log%20Returns.png)
+**Figure 8. USD/LKR across defined economic periods.** The floating/shock period is treated separately from the earlier managed phase and the later stabilization period.
 
-**Figure 7. Twenty-observation rolling volatility.** Volatility changes over time rather than remaining constant. It rises during periods with large daily movements and falls during calmer periods. The first 19 observations cannot have a complete 20-observation rolling statistic.
-
-![20-Day Rolling Volatility Crisis and Stabilization](figures/20-Day%20Rolling%20Volatility-%20Crisis%20vs%20Stabilization.png)
-
-**Figure 8. Rolling volatility during crisis and stabilization.** The crisis period reaches higher and more variable volatility levels than the stabilization period. This is important for financial users because a model may have similar point forecasts while the risk of an unexpectedly large movement is very different.
-
-![Distribution of USD-LKR Log Returns by Regime](figures/Distribution%20of%20USD-LKR%20Log%20Returns.png)
-
-**Figure 9. Return distributions across regimes.** The crisis distribution is wider and has more extreme movements than the stabilization distribution. The chart provides a distributional explanation for the different volatility statistics.
-
-### 3.6 Numerical crisis–stabilization comparison
-
-| Statistic | Crisis 2022 | Stabilization 2023–2024 |
-|---|---:|---:|
-| Number of observations | 240 | 484 |
-| Mean log return | 0.002476 | -0.000446 |
-| Return standard deviation | 0.013481 | 0.005111 |
-| Minimum return | -0.026258 | -0.040162 |
-| Median return | 0.000000 | -0.000044 |
-| Maximum return | 0.127185 | 0.030787 |
-| Mean rolling volatility | 0.006927 | 0.003467 |
-| Rolling-volatility standard deviation | 0.010817 | 0.003560 |
-| Maximum rolling volatility | 0.035897 | 0.017321 |
-
-The crisis mean return is positive, consistent with a rapid increase in the USD/LKR level. Its return standard deviation is more than twice the stabilization value, and its mean rolling volatility is approximately twice the stabilization value. The negative stabilization mean is small relative to the crisis movement and should not be interpreted as a permanent appreciation trend.
-
-### 3.7 Stationarity
-
-The Augmented Dickey–Fuller test results are:
-
-| Series | ADF statistic | p-value | Interpretation |
-|---|---:|---:|---|
-| USD/LKR level | approximately -0.995 | approximately 0.756 | Evidence consistent with non-stationarity |
-| Log returns | -8.442357 | 0.000000 | Evidence of stationarity |
-
-The level test does not reject the unit-root null at the 5% level. The return test rejects it strongly. Therefore, the rate level is unsuitable for methods that require a stationary level without differencing, while returns are more appropriate for volatility analysis.
-
-### 3.8 Autocorrelation and partial autocorrelation
-
-![ACF of USD-LKR Daily Log Returns](figures/ACF%20of%20USD-LKR%20Daily%20Log%20Returns.png)
-
-**Figure 10. Autocorrelation function of returns.** The ACF examines linear correlation between returns and their lagged values. Most lags are small, suggesting limited persistent linear dependence.
-
-![PACF of USD-LKR Daily Log Returns](figures/PACF%20of%20USD-LKR%20Daily%20Log%20Returns.png)
-
-**Figure 11. Partial autocorrelation function of returns.** The PACF measures the additional relationship at each lag after accounting for shorter lags. It does not reveal a strong stable lag structure. This does not prove that the market is perfectly efficient; nonlinear effects, volatility clustering, policy events, and external variables may still matter.
+A Chow-style diagnostic around 9 March 2022 gives an F statistic of 11,416.3745 and p-value 0. This is strong diagnostic evidence of a structural change, although the conventional test should be interpreted cautiously because the series may be serially dependent and heteroskedastic.
 
 ---
 
 ## 4. Feature engineering
 
-The feature-engineering notebook uses `usd_lkr_eda.csv` and creates a modelling table with historical information only. The final dataset has 3,477 rows and no missing values.
+The feature-engineering notebook retains all 3,499 rows, including the latest row needed for the final live-style forecast. It creates:
 
-| Feature group | Variables | Purpose |
+| Feature group | Examples | Purpose |
 |---|---|---|
-| Current state | `USD_LKR`, `log_return`, `rolling_volatility_20` | Describe the current level, movement, and recent risk |
-| Level lags | `Lag_1`, `Lag_5`, `Lag_20` | Capture short-, weekly-scale, and longer short-run persistence |
-| Return lags | `Return_Lag_1`, `Return_Lag_5`, `Return_Lag_20` | Capture momentum or reversal information |
-| Rolling level statistics | `Rolling_Mean_5`, `Rolling_Mean_20` | Capture local and medium short-run trends |
-| Rolling dispersion | `Rolling_Std_20` | Capture recent level variability |
-| Target | `Target` | Next-observation USD/LKR value |
+| Current state | `USD_LKR`, `log_return` | Current level and movement |
+| Calendar-gap information | `days_since_previous_obs`, `long_previous_gap` | Account for irregular observation spacing |
+| Level lags | `Lag_1`, `Lag_5`, `Lag_20` | Observation-based persistence |
+| Return lags | `Return_Lag_1`, `Return_Lag_5`, `Return_Lag_20` | Recent movement and reversal |
+| Rolling statistics | `Rolling_Mean_5`, `Rolling_Mean_20`, `Rolling_Std_20` | Local level and dispersion |
+| Volatility | `rolling_volatility_20` | Recent return risk |
+| Targets | `Target_1`, `Target_5`, `Target_20` and return targets | Future observations for separate horizons |
 
-Lag variables use `shift()`, rolling variables use trailing windows, and the target uses a forward shift. Rows without sufficient history are removed. This design prevents the model from seeing the future target while creating the predictors.
+The feature audit confirms that no target column appears in the feature list. The expected missing values occur only at the start of lagged/rolling features and at the final row’s unavailable future target. Rows whose next observation is more than five calendar days away are excluded from the primary one-step comparison, leaving 3,067 eligible observations.
 
 ---
 
 ## 5. Forecasting methodology
 
-### 5.1 Time-based train/test design
+### 5.1 Chronological evaluation
 
-The modelling table is ordered by date and divided chronologically:
+The eligible observations are split without random shuffling:
 
-- training observations: 2,781;
-- test observations: 696;
-- training proportion: 80%;
-- testing proportion: 20%.
+| Partition | Observations | Coverage |
+|---|---:|---|
+| Training | 2,146 | 2014-01-01 to target 2022-11-30 |
+| Validation | 460 | target dates through 2024-10-28 |
+| Test | 461 | target dates through 2026-09-25 |
 
-![Training and Testing Periods](figures/Training%20and%20Testing%20Periods%20of%20USD-LKR%20Exchange%20Rate.png)
+Validation is used for model/order selection. The test set is reserved for the final comparison on common target rows.
 
-**Figure 12. Chronological training and testing periods.** The test observations occur after the training observations. This avoids the invalid practice of randomly mixing future observations into the training data.
+### 5.2 Models
 
-The project uses a single hold-out test period. This is appropriate for a clear baseline comparison, but a stronger study would add rolling-origin validation and a separately reserved final test period.
+- **Naive:** carries the current rate forward.
+- **ARIMA:** rolling one-step level forecasts with candidate orders (0,1,0), (1,1,0), (0,1,1), and (1,1,1). ARIMA(1,1,1) is selected by validation MAE.
+- **XGBoost-return:** predicts the next log return and converts it back to a rate level. The selected configuration is 300 trees, depth 3, learning rate 0.03, subsample 0.8, and column subsample 0.8.
+- **MLP-return:** a return-based neural network included as an additional machine-learning comparison.
+- **LSTM-return:** predicts the next log return using the preceding 20 observed returns.
+- **GARCH(1,1):** evaluated separately as a conditional-volatility model using variance MSE and QLIKE, not level MAE/RMSE.
 
-### 5.2 Evaluation measures
-
-For actual values \(y_i\) and predictions \(\hat{y}_i\):
-
-$$
-MAE = \frac{1}{n}\sum_{i=1}^{n}|y_i-\hat{y}_i|
-$$
-
-$$
-RMSE = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat{y}_i)^2}.
-$$
-
-MAE measures the typical absolute error in exchange-rate units. RMSE gives more influence to large misses, which is useful when crisis shocks are financially important. Lower values indicate better point-forecast accuracy.
-
-### 5.3 Models
-
-#### Naive benchmark
-
-The naive forecast is:
-
-$$
-\hat{P}_{t+1}=P_t.
-$$
-
-It is a necessary benchmark because exchange-rate levels often display strong short-term persistence. A complex model should outperform this forecast before its added complexity is justified.
-
-#### ARIMA(1,1,1)
-
-ARIMA combines autoregression, first-order differencing, and a moving-average error term. It is fitted to the training level series. The model is designed to represent temporal dependence in a non-stationary level after differencing.
-
-#### GARCH(1,1)
-
-GARCH is fitted to log returns and models time-varying conditional variance. Its predicted return is converted back into a level forecast for comparison with the other models. GARCH is therefore evaluated both as a point-forecast approach and as a volatility model.
-
-#### XGBoost
-
-XGBoost is a gradient-boosted tree regression model using the engineered level, return, and rolling features. It can learn nonlinear relationships and interactions that a linear time-series model may miss.
-
-#### LSTM
-
-The LSTM uses 20 previous USD/LKR observations as a sequence. The level is scaled using a Min-Max scaler fitted only on training data. The network contains LSTM layers with 64 and 32 units, dropout layers, and a one-unit dense output. The training input has shape `(2761, 20, 1)` and the test input has shape `(696, 20, 1)`.
+MAE and RMSE measure level forecast error. MASE, directional accuracy, relative RMSE, and a paired Diebold–Mariano diagnostic add context.
 
 ---
 
 ## 6. Forecasting results
 
-### 6.1 Naive forecast
+### 6.1 Main test-set comparison
 
-![Actual versus Naive Forecast](figures/Actual%20vs%20Naive%20USD-LKR%20Forecast.png)
+| Model | MAE | RMSE | MASE | Directional accuracy | Relative RMSE vs Naive |
+|---|---:|---:|---:|---:|---:|
+| **ARIMA(1,1,1)** | **0.406721** | **0.974414** | 1.303866 | 0.620390 | 1.028479 |
+| Naive | 0.424284 | 0.947432 | 1.360170 | 0.002169 | 1.000000 |
+| XGBoost-return | 0.448500 | 1.100929 | 1.437801 | 0.611714 | 1.162013 |
+| LSTM-return | 0.511477 | 0.982958 | 1.639693 | 0.581345 | 1.037497 |
+| MLP-return | 16.035584 | 19.975001 | 51.406832 | 0.559653 | 21.083300 |
 
-**Figure 13. Actual and naive forecasts.** The naive line is the previous observed rate. It tracks the actual level closely because consecutive published observations are generally close, even though individual daily changes remain unpredictable.
+![One-step-ahead forecasts on the common test period](figures_new/One-Step-Ahead%20USD-LKR%20Forecasts%20on%20the%20Common%20Test%20Period.png)
 
-The naive model obtains MAE 0.463135 and RMSE 0.886722. This establishes a difficult benchmark for the other models.
+**Figure 9. One-step-ahead forecasts on the common test period.** ARIMA has the lowest MAE, while the Naive benchmark remains a strong reference because adjacent exchange-rate observations are often close.
 
-### 6.2 ARIMA forecast
+The Diebold–Mariano diagnostics against Naive are:
 
-![Actual versus ARIMA Forecast](figures/Actual%20vs%20ARIMA%20USD-LKR%20Forecast.png)
+| Model | DM statistic | p-value |
+|---|---:|---:|
+| ARIMA | -2.597451 | 0.009392 |
+| XGBoost-return | 1.240074 | 0.214948 |
+| MLP-return | 28.880227 | 0.000000 |
 
-**Figure 14. Actual and ARIMA forecasts.** The ARIMA forecast does not follow the test-period level as closely as the persistence forecast. The model summary also reports severe non-normality and heteroskedasticity diagnostics, which are consistent with a crisis-affected series that is difficult to represent with a simple ARIMA specification.
+The ARIMA result is statistically distinguishable from Naive under this paired diagnostic, while the XGBoost difference is not significant at conventional levels. These results should still be interpreted with the limitations of one sample and one test design in mind.
 
-ARIMA obtains MAE 23.063531 and RMSE 25.768170. The result indicates weak out-of-sample level tracking for this configuration and test period.
+### 6.2 GARCH volatility results
 
-### 6.3 GARCH forecast and volatility
+The estimated GARCH parameters are \(\mu=0.031017\), \(\omega=0.005061\), \(\alpha=0.213364\), and \(\beta=0.782614\). On the test period, volatility MSE is **0.411381** and QLIKE is **-2.46633** (lower is better). These scores evaluate variance forecasts against realized squared returns; they must not be ranked together with level MAE or RMSE.
 
-![Actual versus GARCH Forecast](figures/Actual%20vs%20GARCH%20USD-LKR%20Forecast.png)
+### 6.3 Feature importance
 
-**Figure 15. Actual and GARCH level forecasts.** GARCH produces a level forecast very close to the naive forecast. Its MAE is 0.465039 and its RMSE is 0.887716, only slightly worse than the naive benchmark.
+![XGBoost feature importance](figures_new/XGBoost%20Feature%20Importance.png)
 
-![GARCH Conditional Volatility](figures/GARCH%20Conditional%20Volatility%20of%20USD-LKR%20Returns.png)
+**Figure 10. XGBoost feature importance.** `Rolling_Std_20` has the largest model-specific importance (0.170780), followed by `Lag_20` (0.112598), `Lag_5` (0.097691), and `rolling_volatility_20` (0.087701). Because many lag and rolling-level variables are highly correlated, importance is diagnostic rather than causal.
 
-**Figure 16. GARCH conditional volatility.** This chart shows the model’s estimate of changing return risk rather than only the expected level. Peaks indicate periods where the model estimates greater conditional uncertainty. Consequently, GARCH provides risk information that the naive point forecast cannot provide.
+### 6.4 Multi-horizon analysis
 
-### 6.4 XGBoost forecast
+| Horizon | Model | Test observations | MAE | RMSE |
+|---:|---|---:|---:|---:|
+| 1 | Naive | 461 | 0.424284 | 0.947432 |
+| 1 | XGBoost-return | 461 | 0.432352 | 1.036141 |
+| 5 | Naive | 457 | 1.115646 | 1.856010 |
+| 5 | XGBoost-return | 457 | 1.444756 | 2.172095 |
+| 20 | Naive | 442 | 2.748674 | 4.088248 |
+| 20 | XGBoost-return | 442 | 4.616474 | 6.197427 |
 
-![Actual versus XGBoost Forecast](figures/Actual%20vs%20XGBoost%20USD-LKR%20Forecast.png)
+Errors increase as the forecast horizon grows. Naive is better than XGBoost-return at all three horizons in this supplementary comparison.
 
-**Figure 17. Actual and XGBoost forecasts.** XGBoost uses all engineered predictors and performs better than ARIMA and LSTM, but its forecast is still less accurate than persistence. The result suggests that the available univariate features did not contain enough stable information to overcome the latest observed level.
+### 6.5 2022 historical stress test
 
-XGBoost obtains MAE 1.857661 and RMSE 2.426569.
+The primary test period is recent and does not contain the March 2022 shock. A separate static-model walk-forward stress test evaluates one-step forecasts during 2022:
 
-### 6.5 LSTM forecast
+| Period | Model | Observations | MAE | RMSE |
+|---|---|---:|---:|---:|
+| 2022 walk-forward window | Naive | 239 | 1.111523 | 3.618012 |
+| 2022 walk-forward window | XGBoost-return | 239 | 4.679923 | 6.154374 |
 
-![Actual versus LSTM Forecast](figures/Actual%20vs%20LSTM%20USD-LKR%20Forecast.png)
-
-**Figure 18. Actual and LSTM forecasts.** The LSTM uses a 20-observation sequence of the exchange-rate level. Its large test error indicates that the chosen architecture and training setup did not generalize well to the chronological test period.
-
-![LSTM Training and Validation Loss](figures/LSTM%20Training%20and%20Validation%20Loss.png)
-
-**Figure 19. LSTM training and validation loss.** The loss curves describe the training process. They are useful for diagnosing convergence and possible overfitting, but they are not a replacement for the final untouched test metrics. The LSTM obtains MAE 7.440381 and RMSE 7.567803.
-
-### 6.6 Final model comparison
-
-The initial notebook comparison contains only Naive and ARIMA:
-
-![Initial Forecasting Model Comparison](figures/Initial%20Forecasting%20Model%20Comparison.png)
-
-**Figure 20. Initial model comparison.** This is an intermediate project checkpoint and documents the first baseline-versus-ARIMA experiment. It should not be interpreted as the final five-model result.
-
-The final comparison is:
-
-| Rank by RMSE | Model | MAE | RMSE |
-|---:|---|---:|---:|
-| 1 | **Naive** | **0.463135** | **0.886722** |
-| 2 | GARCH | 0.465039 | 0.887716 |
-| 3 | XGBoost | 1.857661 | 2.426569 |
-| 4 | LSTM | 7.440381 | 7.567803 |
-| 5 | ARIMA | 23.063531 | 25.768170 |
-
-![MAE Comparison](figures/MAE%20Comparison%20of%20USD-LKR%20Forecasting%20Models.png)
-
-**Figure 21. Final MAE comparison.** Naive and GARCH are almost tied and substantially better than the remaining models. XGBoost is the strongest of the two feature-based nonlinear approaches, but it does not beat persistence.
-
-![RMSE Comparison](figures/RMSE%20Comparison%20of%20USD-LKR%20Forecasting%20Models.png)
-
-**Figure 22. Final RMSE comparison.** The RMSE ranking is the same as the MAE ranking. The larger gap between RMSE and MAE reflects the impact of occasional large forecasting errors.
-
-The final-prediction notebook then loads the complete cleaned master dataset, validates and sorts the observations, selects the latest valid date and rate, and writes the selected Naive forecast to `final_forecast.csv`. The stored output is 330.3522 for the predicted next rate, based on the latest observation dated 2026-09-25. This is a one-step-ahead value rather than a forecast assigned to a fabricated calendar date.
-
-![USD-LKR Exchange Rate: Recent Observations and Naive Forecast](figures/USD-LKR%20Exchange%20Rate-%20Recent%20Observations%20and%20Naive%20Forecast.png)
-
-**Figure 23. Recent USD/LKR observations and Naive forecast.** The figure shows the 30 most recent exchange-rate observations and marks the Naive forecast value. Because the Naive method sets the next predicted rate equal to the latest observed rate, the forecast marker is located at the latest observation value of 330.3522.
+The shock period is substantially harder to forecast, and the Naive benchmark outperforms XGBoost-return in this stress test.
 
 ---
 
-## 7. Discussion
+## 7. Final forecast
 
-### 7.1 Why did the naive model win?
+Validation selects ARIMA(1,1,1), not the model chosen after inspecting the test results. Refit to the complete level series, it uses the latest available observation dated 2026-09-25, whose rate is 330.3522. The next publication date is unknown.
 
-The naive model is strongest for four related reasons:
+| Item | Value |
+|---|---|
+| Latest observation date | 2026-09-25 |
+| Latest observed USD/LKR | 330.3522 |
+| Selected model | ARIMA(1,1,1) |
+| Forecast horizon | Next observed exchange-rate observation |
+| Forecast | **330.3869** |
+| Approximate 95% prediction interval | **327.8478 to 332.9260** |
 
-1. **Short-run persistence:** the next published rate is often close to the current rate.
-2. **Weak return dependence:** the ACF and PACF provide limited evidence of a stable linear return pattern.
-3. **Structural change:** the 2022 crisis creates a relationship that may not generalize to the later test period.
-4. **Limited information set:** all predictive information is derived from the exchange-rate history; external economic drivers are absent.
+![Final USD/LKR forecast for the next observed observation](figures_new/Final%20USD-LKR%20Forecast%20(Next%20Observed%20Observation).png)
 
-The result is not evidence that complex models are universally ineffective. It is evidence that complexity did not improve this one-step-ahead univariate level forecast under the selected split and model settings.
+**Figure 11. Final one-step forecast and approximate prediction interval.** The forecast is shown at a labelled placeholder after the latest observation because the next publication date is not known.
 
-### 7.2 Why was GARCH almost tied?
-
-GARCH is primarily designed to model conditional variance. When the conditional mean return is close to zero, the resulting point level forecast can be very similar to the previous observed level. Therefore, its near-tie with Naive is not surprising. Its main contribution is the conditional-volatility estimate, which is useful for risk monitoring, hedging, and identifying unstable periods.
-
-### 7.3 Why did XGBoost, LSTM, and ARIMA perform worse?
-
-XGBoost can learn nonlinear patterns, but its features are still derived only from past USD/LKR observations. If the next movement is mainly driven by new information, the model cannot observe that information in advance. The LSTM has greater representational capacity, but capacity does not create predictive signal; it can also make training and generalization more sensitive to scaling, architecture, look-back length, and regime changes. ARIMA is interpretable and useful when its assumptions and specification match the data, but this series contains structural breaks, extreme returns, and changing variance that a simple ARIMA(1,1,1) may not capture.
-
-### 7.4 Financial interpretation
-
-For a basic operational one-step forecast, the naive model is attractive because it is accurate, transparent, inexpensive, and easy to update. However, an exchange-rate decision should not use the point forecast alone. A treasury team also needs an estimate of uncertainty. In that context, a practical system could combine the naive level forecast with a GARCH-based volatility estimate and external macroeconomic indicators.
-
-The crisis analysis also shows why historical averages are not enough. During 2022, the average return and volatility were much higher than during stabilization. A model trained across all periods may be acceptable as a general benchmark but may need regime-specific treatment when the economic environment changes.
+The interval is an approximate model-based interval and is not a guarantee. It may under-cover during policy changes, liquidity shocks, or other structural breaks.
 
 ---
 
-## 8. Limitations
+## 8. Discussion
 
-1. **Univariate data:** the models do not include interest rates, inflation, foreign reserves, imports, exports, IMF events, oil, gold, DXY, or other explanatory variables.
-2. **Single hold-out period:** one 80/20 split cannot establish performance stability across different historical regimes.
-3. **No independent validation period:** the LSTM has a validation-loss curve, but the overall model selection does not use a separate chronological validation set.
-4. **One-step horizon:** results may differ for multi-day or multi-month forecasts.
-5. **Limited tuning:** model orders, hyperparameters, look-back windows, and training settings were not evaluated through a systematic search.
-6. **Level-based metrics:** MAE and RMSE of the exchange-rate level favour persistence when adjacent levels are close; return and direction metrics could provide additional insight.
-7. **No prediction intervals:** the final forecast is a point estimate, not a probabilistic forecast.
-8. **Data provenance:** the exact raw-data download metadata should be added before formal submission.
-9. **Date verification:** the late end date should be checked against the official source snapshot.
+ARIMA is the best point-forecast model under the corrected validation and common-test design, but the Naive benchmark remains competitive and has the lowest RMSE among the listed models. This is consistent with short-run persistence: the latest exchange-rate level contains substantial information about the next observed level. XGBoost-return and LSTM-return add nonlinear or sequential capacity, but capacity does not create information about unexpected policy or market shocks. MLP-return is unstable in this configuration and has much larger errors.
+
+The March 2022 break is central to interpretation. The floating/shock period has a much higher mean return and return standard deviation than the managed and post-2022 periods. A model calibrated in one regime may not transfer reliably to another. The 2022 stress test confirms that crisis forecasting is materially more difficult.
+
+GARCH remains useful even though it is not a competing level model. The ARCH-LM result supports conditional-volatility modelling, and the GARCH output provides a risk estimate that a point forecast alone cannot provide. A practical treasury system could therefore combine an ARIMA or Naive point forecast with a volatility forecast and external macroeconomic information.
 
 ---
 
-## 9. Recommendations for future work
+## 9. Limitations
 
-Future research should:
-
-- use rolling-origin or expanding-window validation;
-- reserve a final test period that is not used for model selection;
-- compare crisis-specific, stabilization-specific, and global models;
-- add macroeconomic and market variables;
-- test ARIMA and GARCH variants such as EGARCH and GJR-GARCH;
-- tune XGBoost and LSTM hyperparameters systematically;
-- compare level, return, and direction targets;
-- report prediction intervals and volatility-specific metrics; and
-- record data-source URLs, package versions, random seeds, and execution dates.
+1. The analysis uses one univariate exchange-rate series and does not include interest rates, inflation, reserves, trade flows, political events, intervention data, or international market variables.
+2. The data is an indicative published rate and should not automatically be interpreted as an executable market quote.
+3. Observation gaps mean that an observation-based return may span several calendar days.
+4. The five-day gap rule improves comparability but removes 41 long-gap target rows from the primary comparison.
+5. Results depend on the selected chronological split, feature definitions, hyperparameters, and implementation environment.
+6. The LSTM result depends on optional TensorFlow availability and training behaviour.
+7. A single holdout period cannot establish universal model superiority.
+8. Prediction intervals are approximate and may fail during regime changes.
+9. Level MAE/RMSE, directional accuracy, volatility MSE, and QLIKE answer different questions and should not be combined into one ranking.
 
 ---
 
 ## 10. Conclusion
 
-This project finds that the simple naive forecast is the most accurate model for one-step-ahead USD/LKR level prediction on the selected chronological test period. Its MAE is 0.463135 and RMSE is 0.886722, narrowly outperforming GARCH and clearly outperforming XGBoost, LSTM, and ARIMA. Applying the selected model to the latest stored observation produces a final one-step forecast of 330.3522.
+The corrected analysis finds that ARIMA(1,1,1), selected using validation data, provides the lowest MAE on the common one-step test period: 0.406721. The Naive forecast remains a strong and transparent benchmark, while XGBoost-return and LSTM-return provide no improvement over it in this design. MLP-return performs poorly. GARCH should be interpreted separately as a volatility model, with test volatility MSE 0.411381 and QLIKE -2.46633.
 
-The central lesson is that more complicated models do not automatically provide better forecasts. The latest observed exchange rate contains strong short-run information, while the univariate historical features provide limited additional predictive power. At the same time, GARCH remains valuable for modelling changing risk, and the crisis analysis demonstrates that volatility and return behaviour can differ substantially between economic regimes.
+The selected final model forecasts **330.3869** for the next observed USD/LKR exchange-rate observation, with an approximate 95% interval of **327.8478–332.9260**. The most important practical conclusion is that forecasting performance is regime-dependent: the March 2022 shock is a clear structural break and is much harder to forecast than ordinary periods. A production system should combine transparent point forecasting, volatility monitoring, external explanatory variables, rolling revalidation, and uncertainty reporting.
 
-The project therefore provides a useful baseline study rather than a complete production forecasting system. A stronger practical system would combine the transparent persistence forecast with volatility estimates, external economic information, rolling validation, regime-aware modelling, and uncertainty intervals.
+---
 
 ## 11. Reproduction guide
 
-Run the notebooks in this order:
+The analysis is represented by the following notebooks:
 
-1. [`notebooks/01_data_collection.ipynb`](notebooks/01_data_collection.ipynb)  
-   Reads `cbsl.csv` and creates `master_dataset.csv`.
-2. [`notebooks/02_eda_and_statistics.ipynb`](notebooks/02_eda_and_statistics.ipynb)  
-   Creates returns, rolling volatility, EDA outputs, statistical tests, and EDA figures.
-3. [`notebooks/03_feature_engineering.ipynb`](notebooks/03_feature_engineering.ipynb)  
-   Creates the lagged and rolling predictors and `feature_engineered_dataset.csv`.
-4. [`notebooks/04_model_development_and_forecasting.ipynb`](notebooks/04_model_development_and_forecasting.ipynb)  
-   Trains the five forecasting approaches, creates forecast figures, and saves the model-result tables.
-5. [`notebooks/05_final_prediction.ipynb`](notebooks/05_final_prediction.ipynb)
-   Loads the complete cleaned dataset, applies the selected Naive model to the latest valid observation, visualizes the recent observations, and writes `final_forecast.csv`.
+1. [`notebooks/01_data_collection.ipynb`](notebooks/01_data_collection.ipynb) — filters, validates, and saves the cleaned series.
+2. [`notebooks/02_eda_and_statistics.ipynb`](notebooks/02_eda_and_statistics.ipynb) — creates returns, statistical tests, dependence diagnostics, and regime analysis.
+3. [`notebooks/03_feature_engineering.ipynb`](notebooks/03_feature_engineering.ipynb) — creates leakage-aware lag, rolling, gap, and multi-horizon features.
+4. [`notebooks/04_model_develpoment_and_forecasting.ipynb`](notebooks/04_model_develpoment_and_forecasting.ipynb) — performs chronological validation, common-test evaluation, volatility analysis, feature diagnostics, multi-horizon analysis, and the 2022 stress test.
+5. [`notebooks/05_final_prediction.ipynb`](notebooks/05_final_prediction.ipynb) — refits the validation-selected model and writes the final one-step forecast.
 
-The final outputs should reproduce the five-model metrics, the final stored observation, and the selected Naive forecast documented in this report.
+The report figures are the complete updated set supplied in `figures_new.zip`.
