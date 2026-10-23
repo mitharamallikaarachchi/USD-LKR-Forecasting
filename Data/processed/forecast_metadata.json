@@ -15,6 +15,13 @@
   "naive_validation_MAE": 0.8201308695652155,
   "arima_validation_MAE": 0.8027808561202152,
   "xgboost_validation_MAE": 0.9289477391133345,
+  "best_mlp_config": {
+    "hidden_layer_sizes": [
+      32
+    ],
+    "alpha": 0.001
+  },
+  "mlp_validation_MAE": 29.57241176352674,
   "last_available_date": "2026-09-25",
   "seed": 42,
   "lstm_available": true,
