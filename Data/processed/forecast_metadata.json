@@ -1,0 +1,22 @@
+{
+  "best_arima_order": [
+    1,
+    1,
+    1
+  ],
+  "best_xgb_config": {
+    "n_estimators": 300,
+    "max_depth": 3,
+    "learning_rate": 0.03,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8
+  },
+  "selected_point_forecast_model_by_validation": "ARIMA",
+  "naive_validation_MAE": 0.8201308695652155,
+  "arima_validation_MAE": 0.8027808561202152,
+  "xgboost_validation_MAE": 0.9289477391133345,
+  "last_available_date": "2026-09-25",
+  "seed": 42,
+  "lstm_available": true,
+  "garch_evaluation": "volatility MSE and QLIKE; not level MAE/RMSE"
+}
