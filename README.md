@@ -44,7 +44,7 @@ ARIMA(1,1,1) is selected using validation MAE and achieves the lowest test MAE:
 | Naive | 0.424284 | 0.947432 |
 | XGBoost-return | 0.448500 | 1.100929 |
 | LSTM-return | 0.511477 | 0.982958 |
-| MLP-return | 16.035584 | 19.975001 |
+| MLP-return | 	18.030750 | 22.014662 |
 
 GARCH is evaluated separately as a volatility model rather than being ranked with level forecasts:
 
