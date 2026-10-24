@@ -210,8 +210,4 @@ Do not replace the chronological split with random train/test splitting.
 - A single test period cannot establish universal model superiority, and prediction intervals may under-cover during structural breaks.
 - Level MAE/RMSE, directional accuracy, volatility MSE, and QLIKE answer different questions and should not be merged into one ranking.
 
-## Team
 
-**Team 07**, Financial Time Series Analysis (CM3023), General Sir John Kotelawala Defence University: YT Horawalavithana, RMSS Gamagedara, HM Mallikaarachchi, VJK Rodrigo, KKGS Hansana.
-
-The complete methodology, statistical results, and discussion are in `Project_Report.md` and the formatted report `Formatted_Project_Report_Updated.docx`.
