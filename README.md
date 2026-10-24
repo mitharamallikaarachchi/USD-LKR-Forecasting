@@ -1,65 +1,69 @@
 # USD/LKR Exchange-Rate Forecasting
 
-Forecasting the next published USD/LKR indicative exchange-rate observation under changing economic regimes.
+Forecasting the next published USD/LKR indicative exchange-rate observation with time-series, machine-learning, and volatility models, and measuring how accuracy changes across horizons and economic regimes.
 
-## Project overview
+*Financial Time Series Analysis (CM3023), General Sir John Kotelawala Defence University, Team 07.*
 
-This project develops and evaluates traditional time-series, machine-learning, and volatility models using 3,499 USD/LKR observations from **7 May 2010 to 25 September 2026**. The analysis focuses on the difficulty of forecasting an exchange rate that includes persistence, irregular observation gaps, changing volatility, and the major regime change around March 2022.
+---
 
-The complete workflow covers:
+## Overview
 
-- data validation and cleaning;
-- exchange-rate level and log-return analysis;
-- distributional and stationarity tests;
-- ACF, PACF, Ljung–Box, and ARCH diagnostics;
-- economic-period and structural-break analysis;
-- leakage-aware lag, rolling, and calendar-gap features;
-- chronological validation and testing;
-- one-step and multi-horizon forecasting;
-- separate GARCH volatility evaluation;
-- a 2022 historical stress test; and
-- final model refitting and forecasting.
+The project uses **3,499 CBSL USD/LKR observations (7 May 2010 – 25 September 2026)** and compares a Naive benchmark, ARIMA, XGBoost, MLP, and LSTM for one-step forecasting. GARCH(1,1) is evaluated separately as a volatility model. The analysis is built around two difficulties of this series: persistence with irregular observation gaps, and the major regime change in **March 2022**.
 
-## Research question
+**Research question:** How effectively can the next published USD/LKR observation be forecast using traditional time-series and machine-learning methods, and how does performance change across horizons and economic regimes?
 
-> How effectively can the next published USD/LKR observation be forecast using traditional time-series and machine-learning methods, and how does performance change across horizons and economic regimes?
+The target is the *next available observation*, not a rate assigned to an invented calendar date. Lags and horizons are therefore measured in observations, not calendar days.
 
-The target is the **next available observation**, not a rate assigned to an invented calendar date. Lags and forecast horizons are measured in observations, because the source series contains weekends, holidays, and longer data gaps.
+## Key results
 
-## Main findings
+| Item | Result |
+|---|---|
+| Best point-forecast model (test MAE) | ARIMA(1,1,1): 0.406721 |
+| Naive benchmark (test MAE / RMSE) | 0.424284 / 0.947432 |
+| GARCH(1,1) test volatility MSE / QLIKE | 0.411381 / −2.46633 |
+| Final one-step forecast | **330.3869** (latest observed: 330.3522 on 2026-09-25) |
+| Approximate 95% prediction interval | 327.8478 to 332.9260 |
+| Key structural break | March 2022 (floating / shock regime) |
 
-The primary one-step comparison uses observations from 2014 onward where the next observation is no more than five calendar days away. The 3,067 eligible observations are split chronologically into training, validation, and test sets:
+**Takeaways**
 
-| Partition | Observations |
-|---|---:|
-| Training | 2,146 |
-| Validation | 460 |
-| Test | 461 |
+- ARIMA(1,1,1) has the lowest test MAE, but the Naive benchmark has the lowest RMSE, so no model wins on every metric.
+- Added model complexity did not help: XGBoost, LSTM, and MLP did not beat ARIMA or Naive on MAE.
+- Naive beats XGBoost-return at 1, 5, and 20 observations ahead, and during the 2022 stress test.
+- Point forecasting and volatility forecasting are different tasks and are evaluated separately.
 
-ARIMA(1,1,1) is selected using validation MAE and achieves the lowest test MAE:
+## Dataset overview
 
-| Model | MAE | RMSE |
-|---|---:|---:|
-| **ARIMA(1,1,1)** | **0.406721** | **0.974414** |
-| Naive | 0.424284 | 0.947432 |
-| XGBoost-return | 0.448500 | 1.100929 |
-| LSTM-return | 0.511477 | 0.982958 |
-| MLP-return | 	18.030750 | 22.014662 |
+- **Source:** [Central Bank Exchange Rates (Kaggle)](https://www.kaggle.com/datasets/allratestoday/central-bank-exchange-rates), a multi-country repository of central-bank rates. The Sri Lankan series is isolated from it, so the notebooks refer to it as CBSL data.
+- **Raw file:** `Data/raw/cbsl.csv` with 190,935 rows and five columns: `date`, `base`, `quote`, `type`, and `value` (the exchange rate).
+- **Filter:** only rows with `base == "USD"`, `quote == "LKR"`, and `type == "indicative"` are kept.
+- **Cleaned series:** `Data/processed/master_dataset.csv` with 3,499 observations (3,498 log returns) from 2010-05-07 to 2026-09-25.
+- **Engineered dataset:** `Data/processed/feature_engineered_dataset.csv` keeps all 3,499 rows, including the latest row used for the final forecast.
+- **Final forecast record:** `Data/processed/final_forecast.csv`.
+- **Frequency:** irregular, with weekends, holidays, and longer source gaps. Returns and lags are therefore observation-based, not daily measures.
+- **Data quality:**
+  - no duplicate dates or missing values remain;
+  - 41 gaps exceed five calendar days, and the longest is 65 days;
+  - 387 zero-change observations;
+  - 354 extreme returns were flagged, inspected, and not deleted.
+- **Log-return distribution:** mean 0.000305, standard deviation 0.004890, skewness 8.74, excess kurtosis 201.42, minimum −0.040162, maximum 0.127185. The heavy tails mean a few large shocks can dominate squared-error metrics.
+- **Economic periods:**
+  - Pre-float / managed: 2010-05-07 to 2022-03-08, 2,399 observations, return SD 0.003094;
+  - Floating / 2022 shock: 2022-03-09 to 2022-12-30, 198 observations, return SD 0.014723;
+  - Post-2022 stabilization: 2023-01-02 to 2026-09-25, 902 observations, return SD 0.004269.
+- **Engineered features:**
+  - current state: `USD_LKR`, `log_return`;
+  - calendar gaps: `days_since_previous_obs`, `long_previous_gap`;
+  - lags: `Lag_1`, `Lag_5`, `Lag_20`, `Return_Lag_1`, `Return_Lag_5`, `Return_Lag_20`;
+  - rolling statistics: `Rolling_Mean_5`, `Rolling_Mean_20`, `Rolling_Std_20`, `rolling_volatility_20`;
+  - targets: `Target_1`, `Target_5`, `Target_20`, and return targets.
+- **Leakage control:** no target column appears among the predictors. Rows whose next observation is more than five calendar days away are excluded from the primary one-step comparison, leaving 3,067 eligible observations.
+- **Statistical properties:**
+  - the level series is non-stationary (ADF p = 0.756), while log returns are stationary (ADF p ≈ 1.75 × 10⁻¹³);
+  - Ljung–Box tests show joint serial dependence, and the ARCH-LM test (p ≈ 1.19 × 10⁻¹²³) shows strong conditional heteroskedasticity;
+  - a Chow-style test around 9 March 2022 is highly significant (F = 11,416).
 
-GARCH is evaluated separately as a volatility model rather than being ranked with level forecasts:
-
-- Test volatility MSE: **0.411381**
-- Test QLIKE: **-2.46633**
-
-The validation-selected ARIMA(1,1,1), refit to the full available series, produces:
-
-- **Forecast:** 330.3869
-- **Approximate 95% prediction interval:** 327.8478 to 332.9260
-- **Forecast horizon:** next observed exchange-rate observation
-
-The March 2022 floating/shock period is substantially more volatile and harder to forecast than ordinary periods. The report therefore treats point forecasting, volatility forecasting, and crisis stress testing as separate tasks.
-
-## Project pipeline
+## Methodology
 
 ```text
 Raw CBSL data
@@ -83,34 +87,50 @@ Volatility, multi-horizon, and 2022 stress analyses
 Full-data refit and final one-step forecast
 ```
 
-## Models
+**Evaluation design.** The primary one-step comparison uses 3,067 eligible observations from 2014 onward where the next observation is at most five calendar days away. They are split chronologically, never randomly:
 
-- **Naive baseline:** carries the current USD/LKR rate forward.
-- **ARIMA:** rolling one-step level forecasts; candidate orders are selected using validation MAE.
-- **XGBoost-return:** predicts the next log return and converts it back to a rate level.
-- **MLP-return:** provides an additional return-based machine-learning comparison.
-- **LSTM-return:** uses the previous 20 observed returns to predict the next return.
-- **GARCH(1,1):** forecasts conditional variance and is evaluated using volatility MSE and QLIKE.
+| Partition | Observations |
+|---|---|
+| Training | 2,146 |
+| Validation | 460 |
+| Test | 461 |
 
-## Data
+Features use only information available at the forecast origin: level and return lags (1, 5, 20), rolling mean, standard deviation and volatility, and calendar-gap indicators.
 
-The raw working file is [`Data/raw/cbsl.csv`](Data/raw/cbsl.csv). The notebooks filter it to:
+**Models**
 
-```text
-base == "USD"
-quote == "LKR"
-type == "indicative"
-```
+| Model | Target | Notes |
+|---|---|---|
+| Naive | Next level | Carries the current rate forward. |
+| ARIMA | Next level | Rolling one-step forecasts; orders (0,1,0), (1,1,0), (0,1,1), (1,1,1) compared on validation MAE. |
+| XGBoost-return | Next log return | 300 trees, depth 3, learning rate 0.03, subsample 0.8, column subsample 0.8. |
+| MLP-return | Next log return | Additional return-based neural comparison. |
+| LSTM-return | Next log return | Uses the previous 20 observed returns. |
+| GARCH(1,1) | Conditional variance | Scored with volatility MSE and QLIKE, not ranked against level models. |
 
-The cleaned dataset is [`Data/processed/master_dataset.csv`](Data/processed/master_dataset.csv). The source file contains 190,935 rows and the filtered series contains 3,499 observations. The notebooks identify the file as CBSL data; the exact source URL and retrieval date are not encoded in the CSV and should be added separately if required.
+## Results
 
-Important data-quality facts:
+### One-step test-set comparison (461 observations)
 
-- no duplicate dates remain after cleaning;
-- no missing USD/LKR values remain;
-- 41 gaps exceed five calendar days;
-- the longest calendar gap is 65 days; and
-- returns and lags are observation-based rather than guaranteed daily measures.
+| Model | MAE | RMSE | Directional accuracy |
+|---|---|---|---|
+| **ARIMA(1,1,1)** | **0.406721** | 0.974414 | 0.620390 |
+| Naive | 0.424284 | **0.947432** | n/a (no-change forecast) |
+| XGBoost-return | 0.448500 | 1.100929 | 0.611714 |
+| LSTM-return | 0.511477 | 0.982958 | 0.581345 |
+| MLP-return | 18.030750 | 22.014662 | 0.568330 |
+
+ARIMA reduces MAE by about 4.1% versus Naive, and a Diebold–Mariano test finds the difference significant (DM = −2.60, p = 0.0094). Its RMSE is about 2.8% higher, so Naive is slightly better when large errors dominate.
+
+### Volatility, horizons, and stress test
+
+- **GARCH(1,1):** α + β = 0.995978, indicating highly persistent volatility.
+- **Multi-horizon MAE (Naive vs XGBoost-return):** 5 observations ahead 1.116 vs 1.445; 20 observations ahead 2.749 vs 4.616.
+- **2022 stress test (239 observations):** Naive MAE 1.112 vs XGBoost-return 4.680. Crisis periods are substantially harder to forecast.
+
+### Final forecast
+
+ARIMA(1,1,1), selected on validation MAE and refit to the full series, forecasts the **next observed value at 330.3869** (95% interval 327.8478 to 332.9260). The interval is approximate and may under-cover during structural breaks. Output is saved to `Data/processed/final_forecast.csv`.
 
 ## Repository structure
 
@@ -138,19 +158,27 @@ USD-LKR-Forecasting/
 └── README.md
 ```
 
-## Notebook guide
+## Notebooks
 
 | Notebook | Purpose |
 |---|---|
-| [`01_data_collection.ipynb`](notebooks/01_data_collection.ipynb) | Filters the raw file, checks quality and observation gaps, and saves the cleaned series. |
-| [`02_eda_and_statistics.ipynb`](notebooks/02_eda_and_statistics.ipynb) | Creates returns, evaluates distributions and stationarity, tests dependence and ARCH effects, and compares economic periods. |
-| [`03_feature_engineering.ipynb`](notebooks/03_feature_engineering.ipynb) | Creates lag, rolling, calendar-gap, and one-, five-, and twenty-observation target features. |
-| [`04_model_develpoment_and_forecasting.ipynb`](notebooks/04_model_develpoment_and_forecasting.ipynb) | Performs chronological validation, evaluates models, generates diagnostics, evaluates volatility, and runs supplementary analyses. |
-| [`05_final_prediction.ipynb`](notebooks/05_final_prediction.ipynb) | Refits the validation-selected model using all available observations and writes the final forecast record. |
+| `01_data_collection.ipynb` | Filters the raw file, checks quality and observation gaps, and saves the cleaned series. |
+| `02_eda_and_statistics.ipynb` | Creates returns, evaluates distributions and stationarity, tests dependence and ARCH effects, and compares economic periods. |
+| `03_feature_engineering.ipynb` | Creates lag, rolling, calendar-gap, and one-, five-, and twenty-observation target features. |
+| `04_model_develpoment_and_forecasting.ipynb` | Performs chronological validation, evaluates models and volatility, and runs supplementary analyses. |
+| `05_final_prediction.ipynb` | Refits the validation-selected model on all observations and writes the final forecast record. |
 
-## Updated figures
+## Reproduction
 
-The current report uses the figures in `figures_new/`:
+1. Clone the repository and open it in Jupyter Notebook, JupyterLab, or VS Code.
+2. Install the Python libraries imported at the top of the notebooks (the LSTM requires TensorFlow).
+3. Run the notebooks in numerical order from the repository root so relative paths resolve.
+4. Review outputs in `Data/processed/` and figures in `figures_new/`.
+
+Do not replace the chronological split with random train/test splitting.
+
+<details>
+<summary><strong>Report figures (18)</strong></summary>
 
 1. CBSL USD/LKR indicative exchange rate
 2. USD/LKR exchange rate and log returns
@@ -171,26 +199,19 @@ The current report uses the figures in `figures_new/`:
 17. Recent log returns and final ARIMA(1,1,1) forecast summary
 18. Final forecast for the next observed observation
 
-## Reproduction
-
-1. Open the repository in Jupyter Notebook, JupyterLab, or VS Code.
-2. Run the notebooks in numerical order.
-3. Confirm that the working directory and relative paths point to the repository root.
-4. Review the generated files in [`Data/processed/`](Data/processed/) and figures in [`figures_new/`](figures_new/).
-5. Read the full formatted report in [`Formatted_Project_Report_Updated.docx`](Formatted_Project_Report_Updated.docx) or the source report in [`Project_Report.md`](Project_Report.md).
-
-The modelling evaluation uses chronological splits only; random train/test splitting should not be substituted for the documented workflow.
+</details>
 
 ## Limitations
 
-- The models use one exchange-rate series and do not include macroeconomic or market-external predictors.
-- The data is an indicative published rate and should not automatically be interpreted as an executable market quote.
-- Irregular observation gaps affect the calendar interpretation of returns and lags.
-- The five-day eligibility rule removes long-gap targets from the primary comparison.
-- Results depend on the selected split, features, hyperparameters, and software environment.
-- Prediction intervals are approximate and may under-cover during structural breaks.
-- A single historical test period cannot establish universal model superiority.
+- Univariate analysis: no interest rates, inflation, reserves, trade flows, or other external predictors.
+- The data is an indicative published rate, not an executable market quote.
+- Irregular gaps mean an observation-based return can span several calendar days, and the five-day eligibility rule removes long-gap targets from the primary comparison.
+- Results depend on the chosen split, features, hyperparameters, and software environment; the LSTM also depends on TensorFlow availability and training behaviour.
+- A single test period cannot establish universal model superiority, and prediction intervals may under-cover during structural breaks.
+- Level MAE/RMSE, directional accuracy, volatility MSE, and QLIKE answer different questions and should not be merged into one ranking.
 
-## Full report
+## Team
 
-See [`Project_Report.md`](Project_Report.md) for the complete methodology, statistical results, model comparison, figures, discussion, limitations, and conclusion. The submission-ready formatted version is [`Formatted_Project_Report_Updated.docx`](Formatted_Project_Report_Updated.docx).
+**Team 07**, Financial Time Series Analysis (CM3023), General Sir John Kotelawala Defence University: YT Horawalavithana, RMSS Gamagedara, HM Mallikaarachchi, VJK Rodrigo, KKGS Hansana.
+
+The complete methodology, statistical results, and discussion are in `Project_Report.md` and the formatted report `Formatted_Project_Report_Updated.docx`.
