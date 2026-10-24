@@ -1,0 +1,2 @@
+method,nominal_coverage,test_coverage,mean_width,test_n
+Naive validation-residual quantiles,0.95,0.9848156182212582,6.386882500000012,461

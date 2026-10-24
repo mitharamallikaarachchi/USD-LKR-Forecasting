@@ -1,2 +1,2 @@
 Model,Variance_MSE_vs_Squared_Return,QLIKE,Test_Observations,Return_Scale
-"GARCH(1,1)",0.4113814509828169,-2.4663296553615615,461,percentage log returns
+"GARCH(1,1)",0.40459163410024535,-2.538513477279564,461,percentage log returns

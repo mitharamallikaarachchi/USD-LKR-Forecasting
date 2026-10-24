@@ -1,0 +1,15 @@
+,missing,missing_pct
+USD_LKR,0,0.0
+log_return,1,0.03
+days_since_previous_obs,1,0.03
+long_previous_gap,0,0.0
+Lag_1,1,0.03
+Lag_5,5,0.14
+Lag_20,20,0.57
+Return_Lag_1,2,0.06
+Return_Lag_5,6,0.17
+Return_Lag_20,21,0.6
+Rolling_Mean_5,4,0.11
+Rolling_Mean_20,19,0.54
+Rolling_Std_20,19,0.54
+rolling_volatility_20,20,0.57

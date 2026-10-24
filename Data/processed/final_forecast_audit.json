@@ -1,0 +1,23 @@
+{
+  "generated_utc": "2026-10-24T07:58:05.724046+00:00",
+  "latest_observation_date": "2026-09-25",
+  "forecast_horizon": "next observed date (unknown)",
+  "selected_model": "ARIMA(1, 1, 1)",
+  "seed": 42,
+  "python": "3.13.9",
+  "numpy": "2.3.5",
+  "pandas": "2.3.3",
+  "scikit_learn": "1.7.2",
+  "statsmodels": "0.14.5",
+  "xgboost": "3.4.1",
+  "interval_limitation": "Approximate; not guaranteed 95% coverage",
+  "naive_interval_backtest": [
+    {
+      "method": "Naive validation-residual quantiles",
+      "nominal_coverage": 0.95,
+      "test_coverage": 0.9848156182212582,
+      "mean_width": 6.386882500000012,
+      "test_n": 461
+    }
+  ]
+}

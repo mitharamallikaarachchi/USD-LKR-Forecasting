@@ -13,15 +13,15 @@
   },
   "selected_point_forecast_model_by_validation": "ARIMA",
   "naive_validation_MAE": 0.8201308695652155,
-  "arima_validation_MAE": 0.8027808561202152,
-  "xgboost_validation_MAE": 0.9289477391133345,
+  "arima_validation_MAE": 0.8027808560805496,
+  "xgboost_validation_MAE": 0.9289468590646051,
   "best_mlp_config": {
     "hidden_layer_sizes": [
       32
     ],
     "alpha": 0.001
   },
-  "mlp_validation_MAE": 29.57241176352674,
+  "mlp_validation_MAE": 29.5724117644085,
   "last_available_date": "2026-09-25",
   "seed": 42,
   "lstm_available": true,

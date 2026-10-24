@@ -1,2 +1,2 @@
 Latest_Observation_Date,Forecast_Date,Forecast_Horizon,Selected_Model,Latest_Observed_USD_LKR,Forecast_USD_LKR,Approx_95PI_Lower,Approx_95PI_Upper,Interval_Method
-2026-09-25,Next observed date (not yet known),One-step-ahead / next observed observation,"ARIMA(1, 1, 1)",330.3522,330.38692185427385,327.8478488293395,332.9259948792082,ARIMA model interval
+2026-09-25,Next observed date (not yet known),One-step-ahead / next observed observation,"ARIMA(1, 1, 1)",330.3522,330.38692185428505,327.84784882934025,332.92599487922985,ARIMA model interval
