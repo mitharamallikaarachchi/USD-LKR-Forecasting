@@ -150,19 +150,26 @@ USD-LKR-Forecasting/
 
 ## Updated figures
 
-The current report uses the figures in [`figures_new/`](figures_new/):
+The current report uses the figures in `figures_new/`:
 
 1. CBSL USD/LKR indicative exchange rate
 2. USD/LKR exchange rate and log returns
-3. USD/LKR log returns
+3. Normal Q-Q plot and 20-observation rolling return volatility
 4. Distribution of USD/LKR log returns
 5. Log-return distribution by economic period
-6. ACF of log returns
-7. PACF of log returns
-8. USD/LKR across defined economic periods
-9. One-step-ahead forecasts on the common test period
-10. XGBoost feature importance
-11. Final forecast for the next observed observation
+6. ACF and PACF of log returns
+7. USD/LKR across defined economic periods
+8. Log-return distribution and return standard deviation by economic period
+9. Feature timing alignment versus future targets and trailing rolling metrics
+10. Chronological modelling split across feature dates
+11. Common-test point forecast MAE and error distributions
+12. Naive baseline interval backtest and empirical coverage
+13. One-step-ahead forecasts on the common test period
+14. XGBoost feature importance
+15. Mean absolute error (MAE) by direct forecast horizon
+16. 2022 historical stress test forecasts and MAE comparison
+17. Recent log returns and final ARIMA(1,1,1) forecast summary
+18. Final forecast for the next observed observation
 
 ## Reproduction
 
